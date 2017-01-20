@@ -10,7 +10,7 @@ from typing import (
 from mypy.lex import Token
 import mypy.strconv
 from mypy.visitor import NodeVisitor, StatementVisitor, ExpressionVisitor
-from mypy.util import dump_tagged, short_type
+from mypy.util import short_type, IdMapper
 
 
 class Context:
@@ -2062,14 +2062,37 @@ class TypeInfo(SymbolNode):
 
         This includes the most important information about the type.
         """
+        return self.dump()
+
+    def dump(self,
+             str_conv: 'mypy.strconv.StrConv' = None,
+             type_str_conv: 'mypy.types.TypeStrVisitor' = None) -> str:
+        if not str_conv:
+            str_conv = mypy.strconv.StrConv()
         base = None  # type: str
+
+        def type_str(typ: 'mypy.types.Type') -> str:
+            if type_str_conv:
+                return typ.accept(type_str_conv)
+            return str(typ)
+
+        head = 'TypeInfo' + str_conv.format_id(self)
         if self.bases:
-            base = 'Bases({})'.format(', '.join(str(base)
+            base = 'Bases({})'.format(', '.join(type_str(base)
                                                 for base in self.bases))
-        return dump_tagged(['Name({})'.format(self.fullname()),
-                            base,
-                            ('Names', sorted(self.names.keys()))],
-                           'TypeInfo')
+        names = []
+        for name in sorted(self.names):
+            description = name + str_conv.format_id(self.names[name].node)
+            node = self.names[name].node
+            if isinstance(node, Var) and node.type:
+                description += ' ({})'.format(type_str(node.type))
+            names.append(description)
+        return mypy.strconv.dump_tagged(
+            ['Name({})'.format(self.fullname()),
+             base,
+             ('Names', names)],
+            head,
+            str_conv=str_conv)
 
     def serialize(self) -> JsonDict:
         # NOTE: This is where all ClassDefs originate, so there shouldn't be duplicates.

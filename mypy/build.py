@@ -61,8 +61,9 @@ class BuildResult:
       errors:  List of error messages.
     """
 
-    def __init__(self, manager: 'BuildManager') -> None:
+    def __init__(self, manager: 'BuildManager', graph: Graph) -> None:
         self.manager = manager
+        self.graph = graph
         self.files = manager.modules
         self.types = manager.all_types
         self.errors = manager.errors.messages()
@@ -180,8 +181,8 @@ def build(sources: List[BuildSource],
                            )
 
     try:
-        dispatch(sources, manager)
-        return BuildResult(manager)
+        graph = dispatch(sources, manager)
+        return BuildResult(manager, graph)
     finally:
         manager.log("Build finished in %.3f seconds with %d modules, %d types, and %d errors" %
                     (time.time() - manager.start_time,
@@ -1518,7 +1519,7 @@ class State:
                 self.interface_hash = new_interface_hash
 
 
-def dispatch(sources: List[BuildSource], manager: BuildManager) -> None:
+def dispatch(sources: List[BuildSource], manager: BuildManager) -> Graph:
     manager.log("Mypy version %s" % __version__)
     graph = load_graph(sources, manager)
     if not graph:
@@ -1527,11 +1528,12 @@ def dispatch(sources: List[BuildSource], manager: BuildManager) -> None:
     manager.log("Loaded graph with %d nodes" % len(graph))
     if manager.options.dump_graph:
         dump_graph(graph)
-        return
+        return graph
     process_graph(graph, manager)
     if manager.options.warn_unused_ignores:
         # TODO: This could also be a per-module option.
         manager.errors.generate_unused_ignore_notes()
+    return graph
 
 
 class NodeInfo:

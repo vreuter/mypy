@@ -13,9 +13,9 @@ from mypy.nodes import (
     INVARIANT, SymbolNode,
     ARG_POS, ARG_OPT, ARG_STAR, ARG_STAR2, ARG_NAMED, ARG_NAMED_OPT,
 )
-
 from mypy import experiments
 from mypy.sharedparse import argument_elide_name
+from mypy.util import IdMapper
 
 
 T = TypeVar('T')
@@ -1387,6 +1387,9 @@ class TypeStrVisitor(TypeVisitor[str]):
      - Represent the NoneTyp type as None.
     """
 
+    def __init__(self, id_mapper: IdMapper = None) -> None:
+        self.id_mapper = id_mapper
+
     def visit_unbound_type(self, t: UnboundType)-> str:
         s = t.name + '?'
         if t.args != []:
@@ -1430,6 +1433,8 @@ class TypeStrVisitor(TypeVisitor[str]):
             s += '*'
         if t.args != []:
             s += '[{}]'.format(self.list_str(t.args))
+        if self.id_mapper:
+            s += '<{}>'.format(self.id_mapper.id(t.type))
         return s
 
     def visit_type_var(self, t: TypeVarType) -> str:
@@ -1455,14 +1460,14 @@ class TypeStrVisitor(TypeVisitor[str]):
                 s += '**'
             if t.arg_names[i]:
                 s += t.arg_names[i] + ': '
-            s += str(t.arg_types[i])
+            s += t.arg_types[i].accept(self)
             if t.arg_kinds[i] in (ARG_OPT, ARG_NAMED_OPT):
                 s += ' ='
 
         s = '({})'.format(s)
 
         if not isinstance(t.ret_type, Void):
-            s += ' -> {}'.format(t.ret_type)
+            s += ' -> {}'.format(t.ret_type.accept(self))
 
         if t.variables:
             s = '{} {}'.format(t.variables, s)

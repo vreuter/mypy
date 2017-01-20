@@ -1,0 +1,31 @@
+-- Test cases for fine-grained incremental checking
+--
+-- Test cases may define multiple versions of a file
+-- (e.g. m.py, m.py.2). There is always an initial batch
+-- pass that processes all files present initially, followed
+-- by one or more fine-grained incremental passes that use
+-- alternative versions of files, if available. If a file
+-- just has a single .py version, it is used for all passes.
+
+-- TODO: what if version for some passes but not all
+
+-- Output is laid out like this:
+--
+--   [out]
+--   <optional output from batch pass>
+--   ==
+--   <optional output from first incremental pass>
+
+[case testBasic]
+import m
+def g() -> int:
+    return m.f()
+[file m.py]
+def f() -> int:
+    pass
+[file m.py.2]
+def f() -> str:
+    pass
+[out]
+==
+main:3: error: Incompatible return value type (got "str", expected "int")

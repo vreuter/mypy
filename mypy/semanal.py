@@ -44,8 +44,9 @@ TODO: Check if the third pass slows down type checking significantly.
 """
 
 from collections import OrderedDict
+from contextlib import contextmanager
 from typing import (
-    List, Dict, Set, Tuple, cast, TypeVar, Union, Optional, Callable
+    List, Dict, Set, Tuple, cast, TypeVar, Union, Optional, Callable, Iterator
 )
 
 from mypy.nodes import (
@@ -261,6 +262,20 @@ class SemanticAnalyzer(NodeVisitor):
 
         del self.options
 
+    @contextmanager
+    def file_context(self, file_node: MypyFile, fnam: str, options: Options) -> Iterator[None]:
+        # TODO: Use this above in visit_file
+        self.options = options
+        self.errors.set_file(fnam)
+        self.cur_mod_node = file_node
+        self.cur_mod_id = file_node.fullname()
+        self.is_stub_file = fnam.lower().endswith('.pyi')
+        self.globals = file_node.names
+
+        yield
+
+        del self.options
+
     def visit_func_def(self, defn: FuncDef) -> None:
         phase_info = self.postpone_nested_functions_stack[-1]
         if phase_info != FUNCTION_SECOND_PHASE:
@@ -412,6 +427,9 @@ class SemanticAnalyzer(NodeVisitor):
             pass
         elif isinstance(type, EllipsisType) or isinstance(type, TupleType):
             pass
+        elif isinstance(type, Instance):
+            for arg in type.args:
+                result.extend(self.find_type_variables_in_type(arg))
         else:
             assert False, 'Unsupported type %s' % type
         return result

@@ -180,16 +180,17 @@ class TypeChecker(StatementVisitor[None]):
                 self.fail(messages.ALL_MUST_BE_SEQ_STR.format(str_seq_s, all_s),
                           all_.node)
 
-    def check_second_pass(self) -> bool:
+    def check_second_pass(self, todo: List[DeferredNode] = None) -> bool:
         """Run second or following pass of type checking.
 
         This goes through deferred nodes, returning True if there were any.
         """
-        if not self.deferred_nodes:
+        if not todo and not self.deferred_nodes:
             return False
         self.errors.set_file(self.path)
         self.pass_num += 1
-        todo = self.deferred_nodes
+        if not todo:
+            todo = self.deferred_nodes
         self.deferred_nodes = []
         done = set()  # type: Set[FuncItem]
         for node, type_name, active_class in todo:

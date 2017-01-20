@@ -9,7 +9,7 @@ from mypy.nodes import (
     UnaryExpr, ListExpr, TupleExpr, DictExpr, SetExpr, IndexExpr,
     GeneratorExpr, ListComprehension, ConditionalExpr, TypeApplication,
     FuncExpr, ComparisonExpr, OverloadedFuncDef, YieldFromExpr,
-    YieldExpr
+    YieldExpr, StarExpr, BackquoteExpr, AwaitExpr
 )
 
 
@@ -222,3 +222,12 @@ class TraverserVisitor(NodeVisitor[None]):
 
     def visit_func_expr(self, o: FuncExpr) -> None:
         self.visit_func(o)
+
+    def visit_star_expr(self, o: StarExpr) -> None:
+        o.expr.accept(self)
+
+    def visit_backquote_expr(self, o: BackquoteExpr) -> None:
+        o.expr.accept(self)
+
+    def visit_await_expr(self, o: AwaitExpr) -> None:
+        o.expr.accept(self)
