@@ -79,3 +79,34 @@ def A() -> None: pass
 [out]
 ==
 main:2: error: Invalid type "m.A"
+
+[case testAttributeTypeChanged]
+import m
+def f(a: m.A) -> int:
+    return a.x
+[file m.py]
+class A:
+    def f(self) -> None:
+        self.x = 1
+[file m.py.2]
+class A:
+    def f(self) -> None:
+        self.x = 'x'
+[out]
+==
+main:3: error: Incompatible return value type (got "str", expected "int")
+
+[case testAttributeRemoved]
+import m
+def f(a: m.A) -> int:
+    return a.x
+[file m.py]
+class A:
+    def f(self) -> None:
+        self.x = 1
+[file m.py.2]
+class A:
+    def f(self) -> None: pass
+[out]
+==
+main:3: error: "A" has no attribute "x"

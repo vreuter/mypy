@@ -9,6 +9,8 @@ def strip_node(node: Node) -> None:
 
 
 class NodeStripVisitor(TraverserVisitor):
+    # TODO: Don't recurse into functions when stripping the module top-level.
+
     def visit_func_def(self, node: FuncDef) -> None:
         node.expanded = []
         node.type = node.unanalyzed_type
