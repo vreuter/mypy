@@ -13,6 +13,7 @@ from mypy.nodes import MypyFile, FuncItem
 from mypy.semanal import FirstPass
 from mypy.server.astdiff import compare_symbol_tables
 from mypy.server.astmerge import merge_asts
+from mypy.server.aststrip import strip_node
 from mypy.server.deps import get_dependencies
 from mypy.server.subexpr import get_subexpressions
 from mypy.server.trigger import make_trigger
@@ -144,16 +145,18 @@ def propagate_changes_using_dependencies(
         first = FirstPass(manager.semantic_analyzer)
         for deferred in nodes:
             node = deferred.node
+            # Strip semantic analysis information
+            strip_node(node)
             # First pass
-            node.accept(first)
+            node.accept(first) # TODO: Fix for top level
             semantic_analyzer = manager.semantic_analyzer
             with semantic_analyzer.file_context(
                     file_node=file_node,
                     fnam=file_node.path,
                     options=manager.options):
                 # Second pass
-                node.accept(manager.semantic_analyzer)
-                # Third pass
+                manager.semantic_analyzer.refresh_partial(node)
+                # Third pass # TODO: Fix for top level
                 node.accept(manager.semantic_analyzer_pass3)
         # Type check
         graph[id].type_checker.check_second_pass(list(nodes))  # TODO: check return value

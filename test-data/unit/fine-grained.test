@@ -16,7 +16,7 @@
 --   ==
 --   <optional output from first incremental pass>
 
-[case testRecheckFunction]
+[case testReprocessFunction]
 import m
 def g() -> int:
     return m.f()
@@ -30,7 +30,7 @@ def f() -> str:
 ==
 main:3: error: Incompatible return value type (got "str", expected "int")
 
-[case testRecheckTopLevel]
+[case testReprocessTopLevel]
 import m
 m.f(1)
 def g() -> None: pass
@@ -41,3 +41,29 @@ def f(x: str) -> None: pass
 [out]
 ==
 main:2: error: Argument 1 to "f" has incompatible type "int"; expected "str"
+
+[case testFunctionMissingModuleAttribute]
+import m
+def h() -> None:
+    m.f(1)
+[file m.py]
+def f(x: int) -> None: pass
+[file m.py.2]
+def g(x: str) -> None: pass
+[builtins fixtures/fine_grained.pyi]
+[out]
+==
+main:3: error: "module" has no attribute "f"
+
+[case testTopLevelMissingModuleAttribute]
+import m
+m.f(1)
+def g() -> None: pass
+[file m.py]
+def f(x: int) -> None: pass
+[file m.py.2]
+def g(x: int) -> None: pass
+[builtins fixtures/fine_grained.pyi]
+[out]
+==
+main:2: error: "module" has no attribute "f"

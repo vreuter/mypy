@@ -449,3 +449,47 @@ NameExpr:3: target.A<0>
 CallExpr:4: target.A<0>
 MemberExpr:4: def () -> target.A<0>
 NameExpr:4: target.A<0>
+
+[case testRenameFunction]
+import target
+[file target.py]
+def f() -> int: pass
+[file target.py.next]
+def g() -> int: pass
+[out]
+MypyFile:1<0>(
+  Import:1(target))
+MypyFile:1<1>(
+  tmp/target.py
+  FuncDef:1<2>(
+    f
+    def () -> builtins.int<3>
+    Block:1<4>(
+      PassStmt:1<5>())))
+==>
+MypyFile:1<0>(
+  Import:1(target))
+MypyFile:1<1>(
+  tmp/target.py
+  FuncDef:1<6>(
+    g
+    def () -> builtins.int<3>
+    Block:1<7>(
+      PassStmt:1<8>())))
+
+[case testRenameFunction_symtable]
+import target
+[file target.py]
+def f() -> int: pass
+[file target.py.next]
+def g() -> int: pass
+[out]
+__main__:
+    target: MypyFile<0>
+target:
+    f: FuncDef<1>
+==>
+__main__:
+    target: MypyFile<0>
+target:
+    g: FuncDef<2>

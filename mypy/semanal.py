@@ -76,6 +76,7 @@ from mypy.types import (
     NoneTyp, CallableType, Overloaded, Instance, Type, TypeVarType, AnyType,
     FunctionLike, UnboundType, TypeList, TypeVarDef, TypeType,
     TupleType, UnionType, StarType, EllipsisType, function_type, TypedDictType,
+    Void,
 )
 from mypy.nodes import implicit_module_attrs
 from mypy.typeanal import TypeAnalyser, TypeAnalyserPass3, analyze_type_alias
@@ -262,6 +263,19 @@ class SemanticAnalyzer(NodeVisitor):
 
         del self.options
 
+    def refresh_partial(self, node: Union[MypyFile, FuncItem]) -> None:
+        """Refresh a stale target in fine-grained incremental mode."""
+        if isinstance(node, MypyFile):
+            self.refresh_top_level(node)
+        else:
+            self.accept(node)
+
+    def refresh_top_level(self, file_node: MypyFile) -> None:
+        """Reanalyze a stale module top-level in fine-grained incremental mode."""
+        for d in file_node.defs:
+            if not isinstance(d, (FuncItem, ClassDef)):
+                self.accept(d)
+
     @contextmanager
     def file_context(self, file_node: MypyFile, fnam: str, options: Options) -> Iterator[None]:
         # TODO: Use this above in visit_file
@@ -425,7 +439,8 @@ class SemanticAnalyzer(NodeVisitor):
                 result.extend(self.find_type_variables_in_type(item))
         elif isinstance(type, AnyType):
             pass
-        elif isinstance(type, EllipsisType) or isinstance(type, TupleType):
+        elif isinstance(type, (EllipsisType, TupleType, Void)):
+            # TODO: Need to process tuple items?
             pass
         elif isinstance(type, Instance):
             for arg in type.args:
