@@ -62,7 +62,7 @@ LAST_PASS = 1  # Pass numbers start at 0
 DeferredNode = NamedTuple(
     'DeferredNode',
     [
-        ('node', FuncItem),
+        ('node', Union[FuncItem, MypyFile]),
         ('context_type_name', Optional[str]),  # Name of the surrounding class (for error messages)
         ('active_class', Optional[Type]),  # And its type (for selftype handling)
     ])
@@ -192,7 +192,7 @@ class TypeChecker(StatementVisitor[None]):
         if not todo:
             todo = self.deferred_nodes
         self.deferred_nodes = []
-        done = set()  # type: Set[FuncItem]
+        done = set()  # type: Set[Union[FuncItem, MypyFile]]
         for node, type_name, active_class in todo:
             if node in done:
                 continue
@@ -202,13 +202,28 @@ class TypeChecker(StatementVisitor[None]):
             done.add(node)
             with self.errors.enter_type(type_name) if type_name else nothing():
                 with self.scope.push_class(active_class) if active_class else nothing():
-                    if isinstance(node, Statement):
-                        self.accept(node)
-                    elif isinstance(node, Expression):
-                        self.expr_checker.accept(node)
-                    else:
-                        assert False
+                    self.check_partial(node)
         return True
+
+    def check_partial(self, node: Union[Expression, Statement, FuncItem, MypyFile]) -> None:
+        if isinstance(node, MypyFile):
+            self.check_top_level(node)
+        else:
+            self.accept(node)
+
+    def check_top_level(self, node: MypyFile) -> None:
+        """Check only the top-level of a module, skipping function definitions."""
+        self.enter_partial_types()
+
+        with self.binder.top_frame_context():
+            for d in node.defs:
+                # TODO: Type check class bodies.
+                if not isinstance(d, (FuncDef, ClassDef)):
+                    d.accept(self)
+
+        self.leave_partial_types()
+        assert not self.current_node_deferred
+        # TODO: __all__
 
     def handle_cannot_determine_type(self, name: str, context: Context) -> None:
         node = self.scope.top_function()

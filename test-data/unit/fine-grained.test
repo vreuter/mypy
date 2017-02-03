@@ -16,7 +16,7 @@
 --   ==
 --   <optional output from first incremental pass>
 
-[case testBasic]
+[case testRecheckFunction]
 import m
 def g() -> int:
     return m.f()
@@ -29,3 +29,15 @@ def f() -> str:
 [out]
 ==
 main:3: error: Incompatible return value type (got "str", expected "int")
+
+[case testRecheckTopLevel]
+import m
+m.f(1)
+def g() -> None: pass
+[file m.py]
+def f(x: int) -> None: pass
+[file m.py.2]
+def f(x: str) -> None: pass
+[out]
+==
+main:2: error: Argument 1 to "f" has incompatible type "int"; expected "str"

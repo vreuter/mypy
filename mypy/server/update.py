@@ -134,7 +134,7 @@ def propagate_changes_using_dependencies(
     # TODO: Don't use (only) a set, since items are in an unpredictable order.
     todo = {}  # type: Dict[str, Set[DeferredNode]]
     for target in targets:
-        module_id, name = target.split('.', 1)
+        module_id = target.split('.', 1)[0]
         if module_id not in todo:
             todo[module_id] = set()
         todo[module_id].add(lookup_target(manager.modules, target))
@@ -164,6 +164,6 @@ def lookup_target(modules: Dict[str, MypyFile], target: str) -> DeferredNode:
     node = modules[components[0]]
     for c in components[1:]:
         node = node.names[c].node
-    assert isinstance(node, FuncItem)
+    assert isinstance(node, (FuncItem, MypyFile))
     # TODO: Don't use None arguments
     return DeferredNode(node, None, None)
