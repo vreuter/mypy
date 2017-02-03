@@ -24,7 +24,7 @@ from mypy.nodes import (
     YieldFromExpr, NamedTupleExpr, TypedDictExpr, SetComprehension,
     DictionaryComprehension, ComplexExpr, EllipsisExpr, TypeAliasExpr,
     RefExpr, YieldExpr, BackquoteExpr, ImportFrom, ImportAll, ImportBase,
-    AwaitExpr, PromoteExpr, Node,
+    AwaitExpr, PromoteExpr, Node, EnumCallExpr,
     ARG_POS, MDEF,
     CONTRAVARIANT, COVARIANT)
 from mypy import nodes
@@ -2249,6 +2249,9 @@ class TypeChecker(NodeVisitor[Type]):
 
     def visit_namedtuple_expr(self, e: NamedTupleExpr) -> Type:
         return self.expr_checker.visit_namedtuple_expr(e)
+
+    def visit_enum_call_expr(self, e: EnumCallExpr) -> Type:
+        return self.expr_checker.visit_enum_call_expr(e)
 
     def visit_typeddict_expr(self, e: TypedDictExpr) -> Type:
         return self.expr_checker.visit_typeddict_expr(e)
