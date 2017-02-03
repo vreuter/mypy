@@ -55,7 +55,7 @@ def update_build(manager: BuildManager,
     update_dependenciess(new_modules, deps)
     triggered = calculate_active_triggers(manager, old_modules, new_modules)
     replace_modules_with_new_variants(manager, old_modules, new_modules)
-    propagate_changes_using_dependencies(manager, graph, deps, triggered)
+    propagate_changes_using_dependencies(manager, graph, deps, triggered, set(changed_modules))
     return manager.errors.messages()
 
 
@@ -122,10 +122,17 @@ def propagate_changes_using_dependencies(
         manager: BuildManager,
         graph: Dict[str, State],
         deps: Dict[str, Set[str]],
-        triggered: Set[str]) -> None:
+        triggered: Set[str],
+        up_to_date_modules: Set[str]) -> None:
+    # TODO: Multiple propagation passes
+    # TODO: Multiple type checking passes
+
     todo = find_targets_recursive(triggered, deps, manager.modules)
 
     for id, nodes in todo.items():
+        if id in up_to_date_modules:
+            # Nothing to do
+            continue
         file_node = manager.modules[id]
         first = FirstPass(manager.semantic_analyzer)
         for deferred in nodes:
