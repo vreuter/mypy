@@ -123,22 +123,7 @@ def propagate_changes_using_dependencies(
         graph: Dict[str, State],
         deps: Dict[str, Set[str]],
         triggered: Set[str]) -> None:
-    # Find names of all targets that we will reprocess.
-    targets = set()  # type: Set[str]
-    for trigger in triggered:
-        assert trigger.startswith('<')
-        if trigger in deps:
-            targets |= deps[trigger]
-            # TODO: handle targets that are triggers
-
-    # Find AST nodes corresponding to each target.
-    # TODO: Don't use (only) a set, since items are in an unpredictable order.
-    todo = {}  # type: Dict[str, Set[DeferredNode]]
-    for target in targets:
-        module_id = target.split('.', 1)[0]
-        if module_id not in todo:
-            todo[module_id] = set()
-        todo[module_id].add(lookup_target(manager.modules, target))
+    todo = find_targets_recursive(triggered, deps, manager.modules)
 
     for id, nodes in todo.items():
         file_node = manager.modules[id]
@@ -147,8 +132,7 @@ def propagate_changes_using_dependencies(
             node = deferred.node
             # Strip semantic analysis information
             strip_node(node)
-            # First pass
-            node.accept(first) # TODO: Fix for top level
+            # We don't redo the first pass, because it only does local things.
             semantic_analyzer = manager.semantic_analyzer
             with semantic_analyzer.file_context(
                     file_node=file_node,
@@ -160,6 +144,37 @@ def propagate_changes_using_dependencies(
                 node.accept(manager.semantic_analyzer_pass3)
         # Type check
         graph[id].type_checker.check_second_pass(list(nodes))  # TODO: check return value
+
+
+def find_targets_recursive(
+        triggers: Set[str],
+        deps: Dict[str, Set[str]],
+        modules: Dict[str, MypyFile]) -> Dict[str, Set[DeferredNode]]:
+    """Find names of all targets to reprocess given certain triggers.
+
+    Returns: Dictionary from module id to a set of stale targets.
+    """
+    result = {}  # type: Dict[str, Set[DeferredNode]]
+    worklist = triggers
+    processed = set()  # type: Set[str]
+
+    # Find AST nodes corresponding to each target.
+    #
+    # TODO: Don't use (only) a set, since items are in an unpredictable order.
+    while worklist:
+        processed |= worklist
+        current = worklist
+        worklist = set()
+        for target in current:
+            if target.startswith('<'):
+                worklist |= deps.get(target, set()) - processed
+            else:
+                module_id = target.split('.', 1)[0]
+                if module_id not in result:
+                    result[module_id] = set()
+                result[module_id].add(lookup_target(modules, target))
+
+    return result
 
 
 def lookup_target(modules: Dict[str, MypyFile], target: str) -> DeferredNode:

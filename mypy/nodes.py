@@ -356,6 +356,8 @@ class FuncBase(Node):
     # Type signature. This is usually CallableType or Overloaded, but it can be something else for
     # decorated functions/
     type = None  # type: mypy.types.Type
+    # Original, not semantically analyzed type (used for reprocessing)
+    unanalyzed_type = None  # type: mypy.types.Type
     # If method, reference to TypeInfo
     info = None  # type: TypeInfo
     is_property = False
@@ -486,6 +488,7 @@ class FuncItem(FuncBase):
         self.max_pos = self.arg_kinds.count(ARG_POS) + self.arg_kinds.count(ARG_OPT)
         self.body = body
         self.type = typ
+        self.unanalyzed_type = typ
         self.expanded = []
 
         self.min_args = 0

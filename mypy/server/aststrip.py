@@ -11,7 +11,7 @@ def strip_node(node: Node) -> None:
 class NodeStripVisitor(TraverserVisitor):
     def visit_func_def(self, node: FuncDef) -> None:
         node.expanded = []
-        # TODO: type?
+        node.type = node.unanalyzed_type
         super().visit_func_def(node)
 
     def visit_name_expr(self, node: NameExpr) -> None:

@@ -110,3 +110,16 @@ import n
 x = 1
 [out]
 __main__.n
+
+[case testChangeClassIntoFunction]
+class A: pass
+[file next.py]
+def A() -> None: pass
+[out]
+__main__.A
+
+[case testDeleteClass]
+class A: pass
+[file next.py]
+[out]
+__main__.A

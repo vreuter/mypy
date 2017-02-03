@@ -67,3 +67,15 @@ def g(x: int) -> None: pass
 [out]
 ==
 main:2: error: "module" has no attribute "f"
+
+[case testClassChangedIntoFunction]
+import m
+def f(a: m.A) -> None:
+    pass
+[file m.py]
+class A: pass
+[file m.py.2]
+def A() -> None: pass
+[out]
+==
+main:2: error: Invalid type "m.A"
