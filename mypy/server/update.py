@@ -140,8 +140,8 @@ def propagate_changes_using_dependencies(
                     options=manager.options):
                 # Second pass
                 manager.semantic_analyzer.refresh_partial(node)
-                # Third pass # TODO: Fix for top level
-                node.accept(manager.semantic_analyzer_pass3)
+                # Third pass
+                manager.semantic_analyzer_pass3.refresh_partial(node)
         # Type check
         graph[id].type_checker.check_second_pass(list(nodes))  # TODO: check return value
 

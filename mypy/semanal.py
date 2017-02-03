@@ -3291,6 +3291,19 @@ class ThirdPass(TraverserVisitor):
         self.options = options
         self.accept(file_node)
 
+    def refresh_partial(self, node: Union[MypyFile, FuncItem]) -> None:
+        """Refresh a stale target in fine-grained incremental mode."""
+        if isinstance(node, MypyFile):
+            self.refresh_top_level(node)
+        else:
+            self.accept(node)
+
+    def refresh_top_level(self, file_node: MypyFile) -> None:
+        """Reanalyze a stale module top-level in fine-grained incremental mode."""
+        for d in file_node.defs:
+            if not isinstance(d, (FuncItem, ClassDef)):
+                self.accept(d)
+
     def accept(self, node: Node) -> None:
         try:
             node.accept(self)
