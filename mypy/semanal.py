@@ -2108,7 +2108,7 @@ class SemanticAnalyzer(NodeVisitor):
                     values.append(value)
             else:
                 return self.fail_enum_call_arg(
-                    "%s() with tuple or list of (name, value) pairs not yet supported" %
+                    "%s() with tuple or list expects strings or (name, value) pairs" %
                     class_name,
                     call)
         elif isinstance(args[1], DictExpr):

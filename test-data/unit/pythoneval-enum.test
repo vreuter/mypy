@@ -150,7 +150,7 @@ _program.py:7: error: Revealed type is 'builtins.int'
 [case testFunctionalEnumListOfStrings]
 from enum import Enum, IntEnum
 E = Enum('E', ('foo', 'bar'))
-F = Enum('F', ['bar', 'baz'])
+F = IntEnum('F', ['bar', 'baz'])
 reveal_type(E.foo)
 reveal_type(F.baz)
 [out]
@@ -160,7 +160,7 @@ _program.py:5: error: Revealed type is '_testFunctionalEnumListOfStrings.F'
 [case testFunctionalEnumListOfPairs]
 from enum import Enum, IntEnum
 E = Enum('E', [('foo', 1), ['bar', 2]])
-F = Enum('F', (['bar', 1], ('baz', 2)))
+F = IntEnum('F', (['bar', 1], ('baz', 2)))
 reveal_type(E.foo)
 reveal_type(F.baz)
 reveal_type(E.foo.value)
@@ -202,6 +202,7 @@ N = IntEnum('M', [])
 P = Enum('P', [42])
 Q = Enum('Q', [('a', 42, 0)])
 R = IntEnum('R', [[0, 42]])
+S = Enum('S', {1: 1})
 [out]
 _program.py:2: error: Too few arguments for Enum()
 _program.py:3: error: Enum() expects a string, tuple, list or dict literal as the second argument
@@ -215,6 +216,7 @@ _program.py:10: error: Too many arguments for IntEnum()
 _program.py:11: error: Enum() needs at least one item
 _program.py:12: error: Enum() needs at least one item
 _program.py:13: error: IntEnum() needs at least one item
-_program.py:14: error: Enum() with tuple or list of (name, value) pairs not yet supported
-_program.py:15: error: Enum() with tuple or list of (name, value) pairs not yet supported
-_program.py:16: error: IntEnum() with tuple or list of (name, value) pairs not yet supported
+_program.py:14: error: Enum() with tuple or list expects strings or (name, value) pairs
+_program.py:15: error: Enum() with tuple or list expects strings or (name, value) pairs
+_program.py:16: error: IntEnum() with tuple or list expects strings or (name, value) pairs
+_program.py:17: error: Enum() with dict literal requires string literals
