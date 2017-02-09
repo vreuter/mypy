@@ -94,7 +94,7 @@ def find_steps() -> List[List[Tuple[str, str]]]:
     Each build step is a list of (module id, path) tuples, and each
     path is of form 'dir/mod.py.2' (where 2 is the step number).
     """
-    steps = {}
+    steps = {}  # type: Dict[int, List[Tuple[str, str]]]
     for dn, dirs, files in os.walk(test_temp_dir):
         dnparts = dn.split(os.sep)
         assert dnparts[0] == test_temp_dir

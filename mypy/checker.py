@@ -58,13 +58,15 @@ T = TypeVar('T')
 LAST_PASS = 1  # Pass numbers start at 0
 
 
-# A node which is postponed to be type checked during the next pass.
+# A node which is postponed to be processed during the next pass.
+# This is used for both batch mode and fine-grained incremental mode.
 DeferredNode = NamedTuple(
     'DeferredNode',
     [
-        ('node', Union[FuncItem, MypyFile]),
+        ('node', Union[FuncItem, MypyFile]),  # In batch mode only FuncItem is supported
         ('context_type_name', Optional[str]),  # Name of the surrounding class (for error messages)
-        ('active_class', Optional[Type]),  # And its type (for selftype handling)
+        ('active_typeinfo', Optional[TypeInfo]),  # And its TypeInfo (for semantic analysis
+                                                  # self type handling)
     ])
 
 
@@ -193,7 +195,7 @@ class TypeChecker(StatementVisitor[None]):
             todo = self.deferred_nodes
         self.deferred_nodes = []
         done = set()  # type: Set[Union[FuncItem, MypyFile]]
-        for node, type_name, active_class in todo:
+        for node, type_name, active_typeinfo in todo:
             if node in done:
                 continue
             # This is useful for debugging:
@@ -201,7 +203,7 @@ class TypeChecker(StatementVisitor[None]):
             #       (self.pass_num, type_name, node.fullname() or node.name()))
             done.add(node)
             with self.errors.enter_type(type_name) if type_name else nothing():
-                with self.scope.push_class(active_class) if active_class else nothing():
+                with self.scope.push_class(active_typeinfo) if active_typeinfo else nothing():
                     self.check_partial(node)
         return True
 
@@ -584,7 +586,7 @@ class TypeChecker(StatementVisitor[None]):
                 for i in range(len(typ.arg_types)):
                     arg_type = typ.arg_types[i]
 
-                    ref_type = self.scope.active_class()
+                    ref_type = self.scope.active_self_type()  # type: Type
                     if (isinstance(defn, FuncDef) and ref_type is not None and i == 0
                             and not defn.is_static
                             and typ.arg_kinds[0] not in [nodes.ARG_STAR, nodes.ARG_STAR2]):
@@ -873,7 +875,7 @@ class TypeChecker(StatementVisitor[None]):
             # The name of the method is defined in the base class.
 
             # Construct the type of the overriding method.
-            typ = bind_self(self.function_type(defn), self.scope.active_class())
+            typ = bind_self(self.function_type(defn), self.scope.active_self_type())
             # Map the overridden method type to subtype context so that
             # it can be checked for compatibility.
             original_type = base_attr.type
@@ -886,7 +888,7 @@ class TypeChecker(StatementVisitor[None]):
                     assert False, str(base_attr.node)
             if isinstance(original_type, FunctionLike):
                 original = map_type_from_supertype(
-                    bind_self(original_type, self.scope.active_class()),
+                    bind_self(original_type, self.scope.active_self_type()),
                     defn.info, base)
                 # Check that the types are compatible.
                 # TODO overloaded signatures
@@ -969,7 +971,7 @@ class TypeChecker(StatementVisitor[None]):
             old_binder = self.binder
             self.binder = ConditionalTypeBinder()
             with self.binder.top_frame_context():
-                with self.scope.push_class(fill_typevars(defn.info)):
+                with self.scope.push_class(defn.info):
                     self.accept(defn.defs)
             self.binder = old_binder
             if not defn.has_incompatible_baseclass:
@@ -1222,8 +1224,8 @@ class TypeChecker(StatementVisitor[None]):
                     # Class-level function objects and classmethods become bound
                     # methods: the former to the instance, the latter to the
                     # class
-                    base_type = bind_self(base_type, self.scope.active_class())
-                    compare_type = bind_self(compare_type, self.scope.active_class())
+                    base_type = bind_self(base_type, self.scope.active_self_type())
+                    compare_type = bind_self(compare_type, self.scope.active_self_type())
 
                 # If we are a static method, ensure to also tell the
                 # lvalue it now contains a static method
@@ -1252,7 +1254,8 @@ class TypeChecker(StatementVisitor[None]):
 
             if base_type:
                 if not has_no_typevars(base_type):
-                    instance = cast(Instance, self.scope.active_class())
+                    # TODO: Handle TupleType, don't cast
+                    instance = cast(Instance, self.scope.active_self_type())
                     itype = map_instance_to_supertype(instance, base)
                     base_type = expand_type_by_instance(base_type, itype)
 
@@ -2867,7 +2870,7 @@ def is_node_static(node: Node) -> Optional[bool]:
 
 class Scope:
     # We keep two stacks combined, to maintain the relative order
-    stack = None  # type: List[Union[Type, FuncItem, MypyFile]]
+    stack = None  # type: List[Union[TypeInfo, FuncItem, MypyFile]]
 
     def __init__(self, module: MypyFile) -> None:
         self.stack = [module]
@@ -2878,9 +2881,15 @@ class Scope:
                 return e
         return None
 
-    def active_class(self) -> Optional[Type]:
-        if isinstance(self.stack[-1], Type):
+    def active_class(self) -> Optional[TypeInfo]:
+        if isinstance(self.stack[-1], TypeInfo):
             return self.stack[-1]
+        return None
+
+    def active_self_type(self) -> Optional[Union[Instance, TupleType]]:
+        info = self.active_class()
+        if info:
+            return fill_typevars(info)
         return None
 
     @contextmanager
@@ -2890,8 +2899,8 @@ class Scope:
         self.stack.pop()
 
     @contextmanager
-    def push_class(self, t: Type) -> Iterator[None]:
-        self.stack.append(t)
+    def push_class(self, info: TypeInfo) -> Iterator[None]:
+        self.stack.append(info)
         yield
         self.stack.pop()
 

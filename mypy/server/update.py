@@ -54,7 +54,7 @@ from typing import Dict, List, Set
 from mypy.build import BuildManager, State
 from mypy.checker import DeferredNode
 from mypy.errors import Errors
-from mypy.nodes import MypyFile, FuncItem, TypeInfo, Expression
+from mypy.nodes import MypyFile, FuncItem, TypeInfo, Expression, SymbolNode
 from mypy.types import Type
 from mypy.server.astdiff import compare_symbol_tables
 from mypy.server.astmerge import merge_asts
@@ -210,7 +210,7 @@ def propagate_changes_using_dependencies(
                     file_node=file_node,
                     fnam=file_node.path,
                     options=manager.options,
-                    active_type=deferred.active_class):
+                    active_type=deferred.active_typeinfo):
                 # Second pass
                 manager.semantic_analyzer.refresh_partial(node)
                 # Third pass
@@ -258,13 +258,15 @@ def find_targets_recursive(
 def lookup_target(modules: Dict[str, MypyFile], target: str) -> DeferredNode:
     """Look up a target by fully-qualified name."""
     components = target.split('.')
-    node = modules[components[0]]
+    node = modules[components[0]]  # type: SymbolNode
     active_class = None
     active_class_name = None
     for c in components[1:]:
         if isinstance(node, TypeInfo):
             active_class = node
             active_class_name = node.name()
+        # TODO: Is it possible for the assertion to fail?
+        assert isinstance(node, (MypyFile, TypeInfo))
         node = node.names[c].node
     assert isinstance(node, (FuncItem, MypyFile))
     return DeferredNode(node, active_class_name, active_class)
