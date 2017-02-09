@@ -1524,7 +1524,7 @@ def dispatch(sources: List[BuildSource], manager: BuildManager) -> Graph:
     graph = load_graph(sources, manager)
     if not graph:
         print("Nothing to do?!")
-        return
+        return graph
     manager.log("Loaded graph with %d nodes" % len(graph))
     if manager.options.dump_graph:
         dump_graph(graph)

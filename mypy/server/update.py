@@ -54,7 +54,7 @@ from typing import Dict, List, Set
 from mypy.build import BuildManager, State
 from mypy.checker import DeferredNode
 from mypy.errors import Errors
-from mypy.nodes import MypyFile, FuncItem, TypeInfo, Expression, SymbolNode
+from mypy.nodes import MypyFile, FuncDef, TypeInfo, Expression, SymbolNode
 from mypy.types import Type
 from mypy.server.astdiff import compare_symbol_tables
 from mypy.server.astmerge import merge_asts
@@ -268,5 +268,5 @@ def lookup_target(modules: Dict[str, MypyFile], target: str) -> DeferredNode:
         # TODO: Is it possible for the assertion to fail?
         assert isinstance(node, (MypyFile, TypeInfo))
         node = node.names[c].node
-    assert isinstance(node, (FuncItem, MypyFile))
+    assert isinstance(node, (FuncDef, MypyFile))
     return DeferredNode(node, active_class_name, active_class)
