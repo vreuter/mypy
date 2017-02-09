@@ -42,6 +42,21 @@ def f(x: str) -> None: pass
 ==
 main:2: error: Argument 1 to "f" has incompatible type "int"; expected "str"
 
+[case testReprocessMethod]
+import m
+class B:
+    def f(self, a: m.A) -> None:
+        a.g() # E
+[file m.py]
+class A:
+    def g(self) -> None: pass
+[file m.py.2]
+class A:
+    def g(self, a: A) -> None: pass
+[out]
+==
+main:4: error: Too few arguments for "g" of "A"
+
 [case testFunctionMissingModuleAttribute]
 import m
 def h() -> None:
@@ -79,6 +94,18 @@ def A() -> None: pass
 [out]
 ==
 main:2: error: Invalid type "m.A"
+
+[case testClassChangedIntoFunction2]
+import m
+class B:
+    def f(self, a: m.A) -> None: pass
+[file m.py]
+class A: pass
+[file m.py.2]
+def A() -> None: pass
+[out]
+==
+main:3: error: Invalid type "m.A"
 
 [case testAttributeTypeChanged]
 import m

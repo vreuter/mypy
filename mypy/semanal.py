@@ -277,7 +277,8 @@ class SemanticAnalyzer(NodeVisitor):
                 self.accept(d)
 
     @contextmanager
-    def file_context(self, file_node: MypyFile, fnam: str, options: Options) -> Iterator[None]:
+    def file_context(self, file_node: MypyFile, fnam: str, options: Options,
+                     active_type: Optional[TypeInfo]) -> Iterator[None]:
         # TODO: Use this above in visit_file
         self.options = options
         self.errors.set_file(fnam)
@@ -285,9 +286,15 @@ class SemanticAnalyzer(NodeVisitor):
         self.cur_mod_id = file_node.fullname()
         self.is_stub_file = fnam.lower().endswith('.pyi')
         self.globals = file_node.names
+        if active_type:
+            self.enter_class(active_type.defn)
+            # TODO: Bind class type vars
 
         yield
 
+        if active_type:
+            self.leave_class()
+            self.type = None
         del self.options
 
     def visit_func_def(self, defn: FuncDef) -> None:
@@ -312,7 +319,8 @@ class SemanticAnalyzer(NodeVisitor):
                 # Method definition
                 defn.info = self.type
                 if not defn.is_decorated and not defn.is_overload:
-                    if defn.name() in self.type.names:
+                    if (defn.name() in self.type.names and
+                            self.type.names[defn.name()].node != defn):
                         # Redefinition. Conditional redefinition is okay.
                         n = self.type.names[defn.name()].node
                         if not self.set_original_def(n, defn):

@@ -55,8 +55,7 @@ from typing import Dict, List, Set
 from mypy.build import BuildManager, State
 from mypy.checker import DeferredNode
 from mypy.errors import Errors
-from mypy.nodes import MypyFile, FuncItem
-from mypy.semanal import FirstPass
+from mypy.nodes import MypyFile, FuncItem, TypeInfo
 from mypy.server.astdiff import compare_symbol_tables
 from mypy.server.astmerge import merge_asts
 from mypy.server.aststrip import strip_target
@@ -201,7 +200,6 @@ def propagate_changes_using_dependencies(
     for id, nodes in todo.items():
         assert id not in up_to_date_modules
         file_node = manager.modules[id]
-        first = FirstPass(manager.semantic_analyzer)
         for deferred in nodes:
             node = deferred.node
             # Strip semantic analysis information
@@ -211,7 +209,8 @@ def propagate_changes_using_dependencies(
             with semantic_analyzer.file_context(
                     file_node=file_node,
                     fnam=file_node.path,
-                    options=manager.options):
+                    options=manager.options,
+                    active_type=deferred.active_class):
                 # Second pass
                 manager.semantic_analyzer.refresh_partial(node)
                 # Third pass
@@ -260,8 +259,12 @@ def lookup_target(modules: Dict[str, MypyFile], target: str) -> DeferredNode:
     """Look up a target by fully-qualified name."""
     components = target.split('.')
     node = modules[components[0]]
+    active_class = None
+    active_class_name = None
     for c in components[1:]:
+        if isinstance(node, TypeInfo):
+            active_class = node
+            active_class_name = node.name()
         node = node.names[c].node
     assert isinstance(node, (FuncItem, MypyFile))
-    # TODO: Don't use None arguments
-    return DeferredNode(node, None, None)
+    return DeferredNode(node, active_class_name, active_class)
