@@ -1,7 +1,53 @@
-"""Update previous build result by processing changed modules.
+"""Update build result by incrementally processing changed modules.
 
-Use fine-grained dependencies to update any parts of other modules that
-depend on the changed modules.
+Use fine-grained dependencies to update targets in other modules that
+may be affected by externally-visible changes in the changed modules.
+
+Terms:
+
+* A 'target' is a function definition or the top level of a module. We
+  refer to targets using their fully qualified name (e.g. 'mod.Cls.attr').
+  Targets are the smallest units of processing during fine-grained
+  incremental checking.
+* A 'trigger' represents the properties of a part of a program, and it
+  gets triggered/activated when these properties change. For example,
+  '<mod.func>' refers to a module-level function, and it gets triggered
+  if the signature of the function changes, or if if the function is
+  removed.
+
+Some program state is maintained across multiple build increments:
+
+* Maintain the full ASTs of all modules in memory all the time.
+* Maintain a fine-grained dependency map, which is from triggers to
+  targets/triggers. The latter determine what other parts of a program
+  need to be processed again due to an externally visible change to a
+  module.
+
+We perform a fine-grained incremental program update like this:
+
+* Determine which modules have changes in their source code since the
+  previous build.
+* Fully process these modules, creating new ASTs and symbol tables
+  for them. Retain the existing ASTs and symbol tables of modules that
+  have no changes in their source code.
+* Determine which parts of the changed modules have changed. The result
+  is a set of triggered triggers.
+* Using the dependency map, decide which other targets have become
+  stale and need to be reprocessed.
+* Replace old ASTs of the modules that we reprocessed earlier with
+  the new ones, but try to retain the identities of original externally
+  visible AST nodes so that we don't (always) need to patch references
+  in the rest of the program.
+* Semantically analyze and type check the stale targets.
+* Repeat the previous steps until nothing externally visible has changed.
+
+Major todo items:
+
+- Update dependencies after an incremental change.
+- Support multiple rounds of change propagation.
+- Support multiple type checking passes.
+- Always reprocess targets with errors, even if they aren't explicitly
+  stale.
 """
 
 from typing import Dict, List, Set
@@ -20,7 +66,7 @@ from mypy.server.trigger import make_trigger
 
 
 def get_all_dependencies(manager: BuildManager) -> Dict[str, Set[str]]:
-    """Return fine-grained dependency map for a build."""
+    """Return the fine-grained dependency map for an entire build."""
     deps = {}  # type: Dict[str, Set[str]]
     for id, node in manager.modules.items():
         module_deps = get_dependencies(prefix=id,
@@ -37,14 +83,18 @@ def update_build(manager: BuildManager,
                  changed_modules: List[str]) -> List[str]:
     """Update previous build result by processing changed modules.
 
-    Also propagate changes to other modules as needed.
+    Also propagate changes to other modules as needed, but only process
+    those parts of other modules that are affected by the changes. Retain
+    the existing ASTs and symbol tables of unaffected modules.
 
     TODO: What about blocking errors?
 
     Args:
         manager: State of the build
+        graph: Additional state of the build
         deps: Fine-grained dependcy map for the build (mutated by this function)
-        changed_modules: Modules changed since the previous update/build
+        changed_modules: Modules changed since the previous update/build (assume
+            this is correct; not validated here)
 
     Returns:
         A list of errors.
@@ -61,6 +111,11 @@ def update_build(manager: BuildManager,
 
 def build_incremental_step(manager: BuildManager,
                            changed_modules: List[str]) -> Dict[str, MypyFile]:
+    """Build new versions of changed modules only.
+
+    Return the new ASTs for the changed modules. They will be totally
+    separate from the existing ASTs and need to merged afterwards.
+    """
     assert len(changed_modules) == 1
     id = changed_modules[0]
     path = manager.modules[id].path
@@ -96,6 +151,11 @@ def update_dependenciess(new_modules: Dict[str, MypyFile],
 def calculate_active_triggers(manager: BuildManager,
                               old_modules: Dict[str, MypyFile],
                               new_modules: Dict[str, MypyFile]) -> Set[str]:
+    """Determine activated triggers by comparing old and new symbol tables.
+
+    For example, if only the signature of function m.f is different in the new
+    symbol table, return {'<m.f>'}.
+    """
     names = set()  # type: Set[str]
     for id in new_modules:
         names |= compare_symbol_tables(id, old_modules[id].names, new_modules[id].names)
@@ -106,6 +166,15 @@ def replace_modules_with_new_variants(
         manager: BuildManager,
         old_modules: Dict[str, MypyFile],
         new_modules: Dict[str, MypyFile]) -> None:
+    """Replace modules with newly builds versions.
+
+    Retain the identities of externally visible AST nodes in the
+    old ASTs so that references to the affected modules from other
+    modules will still be valid (unless something was deleted or
+    replaced with an incompatible definition, in which case there
+    will be dangling references that will be handled by
+    propagate_changes_using_dependencies).
+    """
     for id in new_modules:
         if id in old_modules:
             # Remove nodes of old modules from the type map.
@@ -157,7 +226,7 @@ def find_targets_recursive(
         triggers: Set[str],
         deps: Dict[str, Set[str]],
         modules: Dict[str, MypyFile]) -> Dict[str, Set[DeferredNode]]:
-    """Find names of all targets to reprocess given certain triggers.
+    """Find names of all targets that need to reprocessed, given some triggers.
 
     Returns: Dictionary from module id to a set of stale targets.
     """
@@ -167,7 +236,7 @@ def find_targets_recursive(
 
     # Find AST nodes corresponding to each target.
     #
-    # TODO: Don't use (only) a set, since items are in an unpredictable order.
+    # TODO: Don't rely on a set, since the items are in an unpredictable order.
     while worklist:
         processed |= worklist
         current = worklist
@@ -185,6 +254,7 @@ def find_targets_recursive(
 
 
 def lookup_target(modules: Dict[str, MypyFile], target: str) -> DeferredNode:
+    """Look up a target by fully-qualified name."""
     components = target.split('.')
     node = modules[components[0]]
     for c in components[1:]:
