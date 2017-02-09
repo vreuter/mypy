@@ -1,15 +1,28 @@
 """Strip AST from from semantic and type information."""
 
-from mypy.nodes import Node, FuncDef, NameExpr, MemberExpr, RefExpr
+from typing import Union
+
+from mypy.nodes import Node, FuncDef, NameExpr, MemberExpr, RefExpr, MypyFile, FuncItem, ClassDef
 from mypy.traverser import TraverserVisitor
 
 
-def strip_node(node: Node) -> None:
-    node.accept(NodeStripVisitor())
+def strip_target(node: Union[MypyFile, FuncItem]) -> None:
+    NodeStripVisitor().strip_target(node)
 
 
 class NodeStripVisitor(TraverserVisitor):
-    # TODO: Don't recurse into functions when stripping the module top-level.
+    def strip_target(self, node: Union[MypyFile, FuncItem]) -> None:
+        """Strip a fine-grained incremental mode target."""
+        if isinstance(node, MypyFile):
+            self.strip_top_level(node)
+        else:
+            node.accept(self)
+
+    def strip_top_level(self, file_node: MypyFile) -> None:
+        """Strip a module top-level (don't recursive into functions)."""
+        for node in file_node.defs:
+            if not isinstance(node, (FuncItem, ClassDef)):
+                node.accept(self)
 
     def visit_func_def(self, node: FuncDef) -> None:
         node.expanded = []

@@ -59,7 +59,7 @@ from mypy.nodes import MypyFile, FuncItem
 from mypy.semanal import FirstPass
 from mypy.server.astdiff import compare_symbol_tables
 from mypy.server.astmerge import merge_asts
-from mypy.server.aststrip import strip_node
+from mypy.server.aststrip import strip_target
 from mypy.server.deps import get_dependencies
 from mypy.server.subexpr import get_subexpressions
 from mypy.server.trigger import make_trigger
@@ -207,7 +207,7 @@ def propagate_changes_using_dependencies(
         for deferred in nodes:
             node = deferred.node
             # Strip semantic analysis information
-            strip_node(node)
+            strip_target(node)
             # We don't redo the first pass, because it only does local things.
             semantic_analyzer = manager.semantic_analyzer
             with semantic_analyzer.file_context(
