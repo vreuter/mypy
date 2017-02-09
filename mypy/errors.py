@@ -108,6 +108,11 @@ class Errors:
 
     def __init__(self, hide_error_context: bool = True,
                  show_column_numbers: bool = False) -> None:
+        self.hide_error_context = hide_error_context
+        self.show_column_numbers = show_column_numbers
+        self.initialize()
+
+    def initialize(self) -> None:
         self.error_info = []
         self.import_ctx = []
         self.type_name = [None]
@@ -116,8 +121,9 @@ class Errors:
         self.used_ignored_lines = defaultdict(set)
         self.ignored_files = set()
         self.only_once_messages = set()
-        self.hide_error_context = hide_error_context
-        self.show_column_numbers = show_column_numbers
+
+    def reset(self) -> None:
+        self.initialize()
 
     def copy(self) -> 'Errors':
         new = Errors(self.hide_error_context, self.show_column_numbers)

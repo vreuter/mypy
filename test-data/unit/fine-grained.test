@@ -148,3 +148,27 @@ class A: pass
 [out]
 ==
 main:3: error: Name 'm.A' is not defined
+
+[case testTwoIncrementalSteps]
+import m
+import n
+[file m.py]
+def f() -> None: pass
+[file n.py]
+import m
+def g() -> None:
+    m.f() # E
+[file m.py.2]
+import n
+def f(x: int) -> None:
+    n.g() # E
+[file n.py.3]
+import m
+def g(a: str) -> None:
+    m.f('') # E
+[out]
+==
+tmp/n.py:3: error: Too few arguments for "f"
+==
+tmp/n.py:3: error: Argument 1 to "f" has incompatible type "str"; expected "int"
+tmp/m.py:3: error: Too few arguments for "g"

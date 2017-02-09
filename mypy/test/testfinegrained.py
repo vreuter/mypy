@@ -1,6 +1,14 @@
-"""Test cases for fine-grained incremental checking"""
+"""Test cases for fine-grained incremental checking.
+
+Each test cases runs a batch build followed by one or more fine-grained
+incremental steps. We verify that each step produces the expected output.
+
+See the comment at the top of test-data/unit/fine-grained.test for more
+information.
+"""
 
 import os.path
+import re
 import shutil
 from typing import List, Tuple, Dict
 
@@ -48,14 +56,18 @@ class FineGrainedSuite(DataSuite):
 
         deps = get_all_dependencies(manager)
 
-        # TODO: Support arbitrary changes to files, not just m.py
-        shutil.copy(os.path.join(test_temp_dir, 'm.py.2'),
-                    os.path.join(test_temp_dir, 'm.py'))
+        steps = find_steps()
+        for changed_paths in steps:
+            modules = []
+            for module, path in changed_paths:
+                new_path = re.sub(r'\.[0-9]+$', '', path)
+                shutil.copy(path, new_path)
+                modules.append(module)
 
-        new_messages = update_build(manager, graph, deps, ['m'])
+            new_messages = update_build(manager, graph, deps, modules)
 
-        a.append('==')
-        a.extend(new_messages)
+            a.append('==')
+            a.extend(new_messages)
 
         assert_string_arrays_equal(
             testcase.output, a,
@@ -74,3 +86,27 @@ class FineGrainedSuite(DataSuite):
             # TODO: We need a manager and a graph in this case as well
             return e.messages, None, None
         return result.errors, result.manager, result.graph
+
+
+def find_steps() -> List[List[Tuple[str, str]]]:
+    """Return a list of build step representations.
+
+    Each build step is a list of (module id, path) tuples, and each
+    path is of form 'dir/mod.py.2' (where 2 is the step number).
+    """
+    steps = {}
+    for dn, dirs, files in os.walk(test_temp_dir):
+        dnparts = dn.split(os.sep)
+        assert dnparts[0] == test_temp_dir
+        del dnparts[0]
+        for filename in files:
+            m = re.match(r'.*\.([0-9]+)$', filename)
+            if m:
+                num = int(m.group(1))
+                assert num >= 2
+                name = re.sub(r'\.py.*', '', filename)
+                module = '.'.join(dnparts + [name])
+                path = os.path.join(dn, filename)
+                steps.setdefault(num, []).append((module, path))
+    max_step = max(steps)
+    return [steps[num] for num in range(2, max_step + 1)]

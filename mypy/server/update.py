@@ -17,7 +17,7 @@ Terms:
 
 Some program state is maintained across multiple build increments:
 
-* Maintain the full ASTs of all modules in memory all the time.
+* The full ASTs of all modules in memory all the time (+ type map).
 * Maintain a fine-grained dependency map, which is from triggers to
   targets/triggers. The latter determine what other parts of a program
   need to be processed again due to an externally visible change to a
@@ -43,11 +43,10 @@ We perform a fine-grained incremental program update like this:
 
 Major todo items:
 
-- Update dependencies after an incremental change.
-- Support multiple rounds of change propagation.
-- Support multiple type checking passes.
+- Support multiple rounds of change propagation
+- Support multiple type checking passes
 - Always reprocess targets with errors, even if they aren't explicitly
-  stale.
+  stale
 """
 
 from typing import Dict, List, Set
@@ -55,7 +54,8 @@ from typing import Dict, List, Set
 from mypy.build import BuildManager, State
 from mypy.checker import DeferredNode
 from mypy.errors import Errors
-from mypy.nodes import MypyFile, FuncItem, TypeInfo
+from mypy.nodes import MypyFile, FuncItem, TypeInfo, Expression
+from mypy.types import Type
 from mypy.server.astdiff import compare_symbol_tables
 from mypy.server.astmerge import merge_asts
 from mypy.server.aststrip import strip_target
@@ -67,12 +67,7 @@ from mypy.server.trigger import make_trigger
 def get_all_dependencies(manager: BuildManager) -> Dict[str, Set[str]]:
     """Return the fine-grained dependency map for an entire build."""
     deps = {}  # type: Dict[str, Set[str]]
-    for id, node in manager.modules.items():
-        module_deps = get_dependencies(prefix=id,
-                                       node=node,
-                                       type_map=manager.all_types)
-        for trigger, targets in module_deps.items():
-            deps.setdefault(trigger, set()).update(targets)
+    update_dependencies(manager.modules, deps, manager.all_types)
     return deps
 
 
@@ -98,10 +93,11 @@ def update_build(manager: BuildManager,
     Returns:
         A list of errors.
     """
-    # TODO: Maybe clean up stale dependencies.
     old_modules = dict(manager.modules)
+    manager.errors.reset()
     new_modules = build_incremental_step(manager, changed_modules)
-    update_dependenciess(new_modules, deps)
+    # TODO: What to do with stale dependencies?
+    update_dependencies(new_modules, deps, manager.all_types)
     triggered = calculate_active_triggers(manager, old_modules, new_modules)
     replace_modules_with_new_variants(manager, old_modules, new_modules)
     propagate_changes_using_dependencies(manager, graph, deps, triggered, set(changed_modules))
@@ -140,11 +136,15 @@ def build_incremental_step(manager: BuildManager,
     return {id: state.tree}
 
 
-def update_dependenciess(new_modules: Dict[str, MypyFile],
-                         deps: Dict[str, Set[str]]) -> None:
-    # should be kind of easy
-    # TODO
-    pass
+def update_dependencies(new_modules: Dict[str, MypyFile],
+                        deps: Dict[str, Set[str]],
+                        type_map: Dict[Expression, Type]) -> None:
+    for id, node in new_modules.items():
+        module_deps = get_dependencies(prefix=id,
+                                       node=node,
+                                       type_map=type_map)
+        for trigger, targets in module_deps.items():
+            deps.setdefault(trigger, set()).update(targets)
 
 
 def calculate_active_triggers(manager: BuildManager,
