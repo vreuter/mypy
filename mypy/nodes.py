@@ -808,6 +808,8 @@ class AssignmentStmt(Statement):
     rvalue = None  # type: Expression
     # Declared type in a comment, may be None.
     type = None  # type: mypy.types.Type
+    # Original, not semantically analyzed type in annotation (used for reprocessing)
+    unanalyzed_type = None  # type: Optional[mypy.types.Type]
     # This indicates usage of PEP 526 type annotation syntax in assignment.
     new_syntax = False  # type: bool
 
@@ -816,6 +818,7 @@ class AssignmentStmt(Statement):
         self.lvalues = lvalues
         self.rvalue = rvalue
         self.type = type
+        self.unanalyzed_type = type
         self.new_syntax = new_syntax
 
     def accept(self, visitor: StatementVisitor[T]) -> T:

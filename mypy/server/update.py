@@ -196,12 +196,10 @@ def propagate_changes_using_dependencies(
     # TODO: Multiple propagation passes
     # TODO: Multiple type checking passes
 
-    todo = find_targets_recursive(triggered, deps, manager.modules)
+    todo = find_targets_recursive(triggered, deps, manager.modules, up_to_date_modules)
 
     for id, nodes in todo.items():
-        if id in up_to_date_modules:
-            # Nothing to do
-            continue
+        assert id not in up_to_date_modules
         file_node = manager.modules[id]
         first = FirstPass(manager.semantic_analyzer)
         for deferred in nodes:
@@ -225,7 +223,8 @@ def propagate_changes_using_dependencies(
 def find_targets_recursive(
         triggers: Set[str],
         deps: Dict[str, Set[str]],
-        modules: Dict[str, MypyFile]) -> Dict[str, Set[DeferredNode]]:
+        modules: Dict[str, MypyFile],
+        up_to_date_modules: Set[str]) -> Dict[str, Set[DeferredNode]]:
     """Find names of all targets that need to reprocessed, given some triggers.
 
     Returns: Dictionary from module id to a set of stale targets.
@@ -246,9 +245,13 @@ def find_targets_recursive(
                 worklist |= deps.get(target, set()) - processed
             else:
                 module_id = target.split('.', 1)[0]
+                if module_id in up_to_date_modules:
+                    # Already processed.
+                    continue
                 if module_id not in result:
                     result[module_id] = set()
-                result[module_id].add(lookup_target(modules, target))
+                deferred = lookup_target(modules, target)
+                result[module_id].add(deferred)
 
     return result
 

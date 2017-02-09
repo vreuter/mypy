@@ -110,3 +110,14 @@ class A:
 [out]
 ==
 main:3: error: "A" has no attribute "x"
+
+[case testVariableTypeBecomesInvalid]
+import m
+def f() -> None:
+    a = None # type: m.A
+[file m.py]
+class A: pass
+[file m.py.2]
+[out]
+==
+main:3: error: Name 'm.A' is not defined

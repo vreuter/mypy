@@ -2,7 +2,9 @@
 
 from typing import Union
 
-from mypy.nodes import Node, FuncDef, NameExpr, MemberExpr, RefExpr, MypyFile, FuncItem, ClassDef
+from mypy.nodes import (
+    Node, FuncDef, NameExpr, MemberExpr, RefExpr, MypyFile, FuncItem, ClassDef, AssignmentStmt
+)
 from mypy.traverser import TraverserVisitor
 
 
@@ -28,6 +30,10 @@ class NodeStripVisitor(TraverserVisitor):
         node.expanded = []
         node.type = node.unanalyzed_type
         super().visit_func_def(node)
+
+    def visit_assignment_stmt(self, node: AssignmentStmt) -> None:
+        node.type = node.unanalyzed_type
+        super().visit_assignment_stmt(node)
 
     def visit_name_expr(self, node: NameExpr) -> None:
         self.visit_ref_expr(node)
